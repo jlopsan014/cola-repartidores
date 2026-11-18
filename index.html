@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d5f8c">
+<title>Cola de Repartidores</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: mostrador de recogida — formulario arriba, cola en orden de llegada como tickets en un riel */
+:root {
+  --bg: #f3f4f2;
+  --surface: #ffffff;
+  --fg: #1d2320;
+  --muted: #5f6a64;
+  --line: #d9ddd9;
+  --accent: #1d5f8c;
+  --accent-fg: #ffffff;
+  --wait: #b26b00;
+  --wait-bg: #fff3dc;
+  --late: #b3261e;
+  --late-bg: #fde6e3;
+  --ready: #1b7a43;
+  --ready-bg: #ddf3e5;
+  --p-glovo: #c9a400;
+  --p-uber: #1f8a4c;
+  --p-just: #d4561a;
+  --p-otro: #6b6f8a;
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141816; --surface: #1d2220; --fg: #e8ece9; --muted: #9aa5a0; --line: #303834;
+    --accent: #5aa7dc; --accent-fg: #0d1a24;
+    --wait: #f0b14a; --wait-bg: #3a2c12; --late: #ff8a80; --late-bg: #43201d;
+    --ready: #6fd49a; --ready-bg: #16352345;
+    --p-glovo: #e6c43a; --p-uber: #5ccf8c; --p-just: #f08a55; --p-otro: #a3a7c6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141816; --surface: #1d2220; --fg: #e8ece9; --muted: #9aa5a0; --line: #303834;
+  --accent: #5aa7dc; --accent-fg: #0d1a24;
+  --wait: #f0b14a; --wait-bg: #3a2c12; --late: #ff8a80; --late-bg: #43201d;
+  --ready: #6fd49a; --ready-bg: #16352345;
+  --p-glovo: #e6c43a; --p-uber: #5ccf8c; --p-just: #f08a55; --p-otro: #a3a7c6;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 40px;
+}
+.wrap { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+h1 { font-family: var(--display); font-size: 2rem; letter-spacing: .01em; margin: 0; line-height: 1; text-wrap: balance; }
+.sub { color: var(--muted); font-size: .85rem; margin-top: 4px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 10px 14px; min-height: 44px; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.tab[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+
+/* Formulario de llegada */
+.arrive { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.label { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.platforms { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.plat { font-weight: 600; min-height: 56px; border-width: 2px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.plat .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--pc); flex: none; }
+.plat[aria-pressed="true"] { border-color: var(--pc); background: color-mix(in srgb, var(--pc) 16%, var(--surface)); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row input { flex: 1 1 220px; min-width: 0; font: inherit; font-size: 1.25rem; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; padding-inline: 22px; }
+.hint { color: var(--muted); font-size: .85rem; }
+
+/* Resumen */
+.stats { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: baseline; color: var(--muted); font-size: .9rem; }
+.stats b { font-family: var(--display); font-size: 1.6rem; color: var(--fg); font-variant-numeric: tabular-nums; margin-right: 4px; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; align-items: center; }
+.toolbar input { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); flex: 1 1 200px; min-width: 0; max-width: 340px; }
+
+/* Cola */
+.queue { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ticket { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto auto; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--pc); border-radius: 10px; padding: 10px 12px; }
+.pos { font-family: var(--display); font-size: 2rem; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
+.who { min-width: 0; }
+.code { font-family: var(--display); font-weight: 700; font-size: 1.9rem; line-height: 1.05; overflow-wrap: anywhere; }
+.meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: .82rem; color: var(--muted); margin-top: 2px; }
+.chip { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: 3px 8px; border-radius: 999px; }
+.chip.plat-chip { color: var(--pc); border: 1px solid var(--pc); }
+.chip.st-wait { background: var(--wait-bg); color: var(--wait); }
+.chip.st-ready { background: var(--ready-bg); color: var(--ready); }
+.chip.example { background: var(--line); color: var(--muted); }
+.timer { font-family: var(--display); font-size: 1.6rem; font-variant-numeric: tabular-nums; padding: 4px 10px; border-radius: 8px; text-align: center; min-width: 76px; }
+.timer.ok { color: var(--fg); }
+.timer.warn { background: var(--wait-bg); color: var(--wait); }
+.timer.late { background: var(--late-bg); color: var(--late); }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.btn-ready { background: var(--ready-bg); color: var(--ready); border-color: var(--ready); font-weight: 600; }
+.btn-done { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
+.btn-ghost { color: var(--muted); }
+.btn-danger { color: var(--late); border-color: var(--late); }
+.ticket.ready { background: color-mix(in srgb, var(--ready-bg) 55%, var(--surface)); }
+.empty { text-align: center; color: var(--muted); padding: 36px 16px; border: 2px dashed var(--line); border-radius: 12px; }
+.empty strong { display: block; color: var(--fg); font-size: 1.05rem; margin-bottom: 4px; }
+
+/* Historial */
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+
+/* Pantalla para repartidores */
+.board { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.board section { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-width: 0; }
+.board h2 { font-family: var(--display); font-size: 1.8rem; margin: 0 0 12px; display: flex; align-items: center; gap: 10px; }
+.board h2 .sw { width: 14px; height: 14px; border-radius: 50%; }
+.board ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.board li { border-radius: 10px; padding: 12px; border-left: 6px solid var(--pc); background: var(--bg); min-width: 0; }
+.board li .code { font-size: 2.4rem; }
+.board .ready-col li { background: var(--ready-bg); }
+.board .ready-col li .code { color: var(--ready); }
+.board .platname { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+
+.confirm { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: .85rem; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-weight: 500; z-index: 20; display: flex; gap: 12px; align-items: center; }
+.toast button { min-height: 32px; padding: 4px 10px; background: transparent; color: var(--bg); border-color: var(--bg); }
+
+@media (max-width: 720px) {
+  .platforms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ticket { grid-template-columns: 40px minmax(0, 1fr) auto; }
+  .ticket .actions { grid-column: 1 / -1; justify-content: stretch; }
+  .ticket .actions button { flex: 1; }
+  .pos { font-size: 1.5rem; }
+  .board { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ticket { transition: background .2s; }
+}
+[hidden]{display:none!important}
+body{margin:0}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Cola de Repartidores</h1>
+      <div class="sub" id="clock"></div>
+    </div>
+    <div class="tabs" role="group" aria-label="Vista">
+      <button class="tab" id="tab-cola" aria-pressed="true" data-view="cola">Mostrador</button>
+      <button class="tab" id="tab-pantalla" aria-pressed="false" data-view="pantalla">Pantalla repartidores</button>
+      <button class="tab" id="tab-historial" aria-pressed="false" data-view="historial">Entregados</button>
+    </div>
+  </header>
+
+  <!-- VISTA MOSTRADOR -->
+  <div id="view-cola" class="wrap" style="max-width:none">
+    <form class="arrive" id="arrive-form" autocomplete="off">
+      <div class="label">1 · Plataforma del repartidor</div>
+      <div class="platforms" id="platforms"></div>
+      <div class="label" id="code-label">2 · Código del pedido</div>
+      <div class="row">
+        <input id="code-input" placeholder="Ej. 4F2A" aria-labelledby="code-label" enterkeyhint="done">
+        <button type="submit" class="primary" id="add-btn">Registrar llegada</button>
+      </div>
+      <div class="hint" id="code-hint"></div>
+    </form>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Buscar código o nombre…" aria-label="Buscar pedido">
+      <div class="row" id="example-bar"></div>
+    </div>
+
+    <ol class="queue" id="queue"></ol>
+  </div>
+
+  <!-- VISTA PANTALLA -->
+  <div id="view-pantalla" hidden>
+    <div class="board">
+      <section class="ready-col">
+        <h2><span class="sw" style="background:var(--ready)"></span>Listo para recoger</h2>
+        <ul id="board-ready"></ul>
+      </section>
+      <section>
+        <h2><span class="sw" style="background:var(--wait)"></span>Preparando</h2>
+        <ul id="board-wait"></ul>
+      </section>
+    </div>
+  </div>
+
+  <!-- VISTA HISTORIAL -->
+  <div id="view-historial" class="wrap" style="max-width:none" hidden>
+    <div class="stats" id="hist-stats"></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Plataforma</th><th>Pedido</th><th>Llegó</th><th>Entregado</th><th>Espera</th></tr></thead>
+        <tbody id="hist-body"></tbody>
+      </table>
+    </div>
+    <div class="row" id="hist-actions"></div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const PLATFORMS = [
+  { id: "glovo", name: "Glovo", color: "var(--p-glovo)", field: "Código del pedido", ph: "Ej. 4F2A", hint: "Pide al repartidor el código o los dígitos que ve en su app." },
+  { id: "uber", name: "Uber Eats", color: "var(--p-uber)", field: "Nombre o código", ph: "Ej. Laura M. · 3B7C9", hint: "Pide el nombre del cliente o el código del pedido." },
+  { id: "just", name: "Just Eat", color: "var(--p-just)", field: "Nº de pedido", ph: "Ej. 81234", hint: "Pide los dígitos del pedido." },
+  { id: "otro", name: "Otra", color: "var(--p-otro)", field: "Nombre o código", ph: "Ej. Pedido web 22", hint: "Cualquier otra plataforma o recogida." }
+];
+const P = Object.fromEntries(PLATFORMS.map(p => [p.id, p]));
+const KEY = "cola-repartidores-v1";
+const WARN_MIN = 5, LATE_MIN = 10;
+
+let state = { orders: [], platform: "glovo" };
+let view = "cola", filter = "", confirmId = null, lastRemoved = null;
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function exampleOrders() {
+  const now = Date.now(), m = 60000;
+  return [
+    { id: uid(), platform: "uber", code: "Laura M.", arrived: now - 11.5 * m, status: "waiting", example: true },
+    { id: uid(), platform: "glovo", code: "4F2A", arrived: now - 6.2 * m, status: "ready", readyAt: now - 1 * m, example: true },
+    { id: uid(), platform: "just", code: "81234", arrived: now - 3.4 * m, status: "waiting", example: true },
+    { id: uid(), platform: "glovo", code: "9KX1", arrived: now - 0.8 * m, status: "waiting", example: true },
+    { id: uid(), platform: "uber", code: "3B7C9", arrived: now - 25 * m, status: "done", readyAt: now - 20 * m, doneAt: now - 19 * m, example: true }
+  ];
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) { const s = JSON.parse(raw); if (s && Array.isArray(s.orders)) { state = Object.assign(state, s); return; } }
+  } catch (e) {}
+  state.orders = exampleOrders();
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+function fmtDur(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(s / 60), r = s % 60;
+  return m + ":" + String(r).padStart(2, "0");
+}
+function fmtTime(t) { return new Date(t).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }); }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); }
+
+function toast(msg, undo) {
+  const t = document.getElementById("toast");
+  t.innerHTML = "<span>" + esc(msg) + "</span>" + (undo ? '<button type="button" id="undo-btn">Deshacer</button>' : "");
+  t.hidden = false;
+  if (undo) document.getElementById("undo-btn").onclick = () => { undo(); t.hidden = true; };
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { t.hidden = true; }, 5000);
+}
+
+/* ---------- Formulario ---------- */
+function renderPlatforms() {
+  const box = document.getElementById("platforms");
+  box.innerHTML = PLATFORMS.map(p =>
+    `<button type="button" class="plat" id="plat-${p.id}" style="--pc:${p.color}" data-p="${p.id}" aria-pressed="${state.platform === p.id}"><span class="dot"></span>${p.name}</button>`
+  ).join("");
+  const p = P[state.platform];
+  document.getElementById("code-label").textContent = "2 · " + p.field;
+  document.getElementById("code-input").placeholder = p.ph;
+  document.getElementById("code-hint").textContent = p.hint;
+}
+document.getElementById("platforms").addEventListener("click", e => {
+  const b = e.target.closest("[data-p]"); if (!b) return;
+  state.platform = b.dataset.p; save(); renderPlatforms();
+  document.getElementById("code-input").focus();
+});
+document.getElementById("arrive-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const input = document.getElementById("code-input");
+  const code = input.value.trim();
+  if (!code) { input.focus(); toast("Escribe el código o el nombre del pedido."); return; }
+  const dup = state.orders.find(o => o.status !== "done" && o.platform === state.platform && o.code.toLowerCase() === code.toLowerCase());
+  if (dup) { toast("Ese pedido ya está en la cola (puesto " + (activeOrders().indexOf(dup) + 1) + ")."); return; }
+  state.orders.push({ id: uid(), platform: state.platform, code, arrived: Date.now(), status: "waiting" });
+  input.value = ""; save(); render();
+  toast(P[state.platform].name + " · " + code + " registrado");
+  input.focus();
+});
+
+/* ---------- Cola ---------- */
+function activeOrders() { return state.orders.filter(o => o.status !== "done").sort((a, b) => a.arrived - b.arrived); }
+
+function timerClass(ms) { const m = ms / 60000; return m >= LATE_MIN ? "late" : m >= WARN_MIN ? "warn" : "ok"; }
+
+function renderQueue() {
+  const list = activeOrders();
+  const q = filter.toLowerCase();
+  const shown = list.filter(o => !q || o.code.toLowerCase().includes(q) || P[o.platform].name.toLowerCase().includes(q));
+  const el = document.getElementById("queue");
+  if (!list.length) {
+    el.innerHTML = `<li class="empty"><strong>No hay repartidores esperando</strong>Cuando llegue uno, elige su plataforma, escribe el código y pulsa «Registrar llegada».</li>`;
+  } else if (!shown.length) {
+    el.innerHTML = `<li class="empty"><strong>Ningún pedido coincide con «${esc(filter)}»</strong>Prueba con otra parte del código o del nombre.</li>`;
+  } else {
+    const now = Date.now();
+    el.innerHTML = shown.map(o => {
+      const p = P[o.platform], pos = list.indexOf(o) + 1, wait = now - o.arrived;
+      const ready = o.status === "ready";
+      let actions;
+      if (confirmId === o.id) {
+        actions = `<div class="confirm"><span>¿Quitar de la cola?</span><button class="btn-danger" data-act="remove" data-id="${o.id}">Quitar</button><button class="btn-ghost" data-act="cancel">No</button></div>`;
+      } else {
+        actions = (ready
+          ? `<button class="btn-done" data-act="done" data-id="${o.id}">Entregado</button><button class="btn-ghost" data-act="unready" data-id="${o.id}">No listo</button>`
+          : `<button class="btn-ready" data-act="ready" data-id="${o.id}">Listo</button>`)
+          + `<button class="btn-ghost" data-act="ask" data-id="${o.id}" aria-label="Quitar pedido ${esc(o.code)}">✕</button>`;
+      }
+      return `<li class="ticket ${ready ? "ready" : ""}" style="--pc:${p.color}">
+        <div class="pos" aria-label="Puesto ${pos}">${pos}</div>
+        <div class="who">
+          <div class="code">${esc(o.code)}</div>
+          <div class="meta"><span class="chip plat-chip">${p.name}</span>
+            <span class="chip ${ready ? "st-ready" : "st-wait"}">${ready ? "Listo" : "Esperando"}</span>
+            <span>Llegó ${fmtTime(o.arrived)}</span>${o.example ? '<span class="chip example">Ejemplo</span>' : ""}</div>
+        </div>
+        <div class="timer ${timerClass(wait)}" data-arrived="${o.arrived}" title="Tiempo esperando">${fmtDur(wait)}</div>
+        <div class="actions">${actions}</div>
+      </li>`;
+    }).join("");
+  }
+  const waiting = list.filter(o => o.status === "waiting").length;
+  const ready = list.filter(o => o.status === "ready").length;
+  const late = list.filter(o => Date.now() - o.arrived >= LATE_MIN * 60000).length;
+  const doneToday = todayDone();
+  const avg = doneToday.length ? doneToday.reduce((s, o) => s + (o.doneAt - o.arrived), 0) / doneToday.length : 0;
+  document.getElementById("stats").innerHTML =
+    `<span><b>${waiting}</b>esperando</span><span><b>${ready}</b>listos</span>` +
+    `<span><b style="color:${late ? "var(--late)" : "inherit"}">${late}</b>más de ${LATE_MIN} min</span>` +
+    `<span><b>${doneToday.length}</b>entregados hoy</span><span><b>${doneToday.length ? fmtDur(avg) : "–"}</b>espera media</span>`;
+  const hasEx = state.orders.some(o => o.example);
+  document.getElementById("example-bar").innerHTML = hasEx ? `<button class="btn-ghost" data-act="clear-examples">Quitar pedidos de ejemplo</button>` : "";
+}
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const id = b.dataset.id, o = state.orders.find(x => x.id === id);
+  switch (b.dataset.act) {
+    case "ready": o.status = "ready"; o.readyAt = Date.now(); break;
+    case "unready": o.status = "waiting"; delete o.readyAt; break;
+    case "done": {
+      o.status = "done"; o.doneAt = Date.now();
+      toast(P[o.platform].name + " · " + o.code + " entregado", () => { o.status = "ready"; delete o.doneAt; save(); render(); });
+      break;
+    }
+    case "ask": confirmId = id; break;
+    case "cancel": confirmId = null; break;
+    case "remove": {
+      const idx = state.orders.indexOf(o); state.orders.splice(idx, 1); confirmId = null;
+      toast("Pedido " + o.code + " quitado", () => { state.orders.splice(idx, 0, o); save(); render(); });
+      break;
+    }
+    case "clear-examples": state.orders = state.orders.filter(x => !x.example); toast("Ejemplos quitados"); break;
+    case "clear-history": {
+      const before = state.orders.slice();
+      state.orders = state.orders.filter(x => x.status !== "done");
+      toast("Historial borrado", () => { state.orders = before; save(); render(); });
+      break;
+    }
+    default: return;
+  }
+  save(); render();
+});
+document.getElementById("search").addEventListener("input", e => { filter = e.target.value.trim(); renderQueue(); });
+
+/* ---------- Pantalla ---------- */
+function renderBoard() {
+  const list = activeOrders();
+  const card = o => `<li style="--pc:${P[o.platform].color}"><div class="platname">${P[o.platform].name}</div><div class="code">${esc(o.code)}</div></li>`;
+  const r = list.filter(o => o.status === "ready"), w = list.filter(o => o.status === "waiting");
+  document.getElementById("board-ready").innerHTML = r.length ? r.map(card).join("") : `<li style="--pc:var(--line);background:transparent" class="hint">Nada listo todavía</li>`;
+  document.getElementById("board-wait").innerHTML = w.length ? w.map(card).join("") : `<li style="--pc:var(--line);background:transparent" class="hint">Sin pedidos en preparación</li>`;
+}
+
+/* ---------- Historial ---------- */
+function todayDone() {
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  return state.orders.filter(o => o.status === "done" && o.doneAt >= start.getTime());
+}
+function renderHistory() {
+  const done = state.orders.filter(o => o.status === "done").sort((a, b) => b.doneAt - a.doneAt);
+  document.getElementById("hist-body").innerHTML = done.length
+    ? done.map(o => `<tr><td><span class="chip plat-chip" style="--pc:${P[o.platform].color}">${P[o.platform].name}</span></td><td><strong>${esc(o.code)}</strong>${o.example ? ' <span class="chip example">Ejemplo</span>' : ""}</td><td>${fmtTime(o.arrived)}</td><td>${fmtTime(o.doneAt)}</td><td>${fmtDur(o.doneAt - o.arrived)}</td></tr>`).join("")
+    : `<tr><td colspan="5" class="hint">Aún no se ha entregado ningún pedido.</td></tr>`;
+  const by = PLATFORMS.map(p => { const n = done.filter(o => o.platform === p.id).length; return n ? `<span><b>${n}</b>${p.name}</span>` : ""; }).join("");
+  document.getElementById("hist-stats").innerHTML = `<span><b>${done.length}</b>entregados</span>` + by;
+  document.getElementById("hist-actions").innerHTML = done.length ? `<button class="btn-danger" data-act="clear-history">Borrar historial</button>` : "";
+}
+
+/* ---------- Vistas y reloj ---------- */
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => setView(t.dataset.view)));
+function setView(v) {
+  view = v;
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-pressed", t.dataset.view === v));
+  ["cola", "pantalla", "historial"].forEach(n => document.getElementById("view-" + n).hidden = n !== v);
+  try { history.replaceState(null, "", "#" + v); } catch (e) {}
+  render();
+}
+function render() {
+  if (view === "cola") renderQueue();
+  else if (view === "pantalla") renderBoard();
+  else renderHistory();
+}
+function tick() {
+  const now = Date.now();
+  document.getElementById("clock").textContent = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" }) + " · " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  document.querySelectorAll(".timer[data-arrived]").forEach(t => {
+    const ms = now - Number(t.dataset.arrived);
+    t.textContent = fmtDur(ms); t.className = "timer " + timerClass(ms);
+  });
+}
+// Si otra pestaña cambia los datos, sincronizar
+window.addEventListener("storage", e => { if (e.key === KEY) { load(); render(); } });
+// Mantener la pantalla encendida si el navegador lo permite
+async function keepAwake() { try { if (navigator.wakeLock) await navigator.wakeLock.request("screen"); } catch (e) {} }
+document.addEventListener("visibilitychange", () => { if (!document.hidden) keepAwake(); });
+
+load(); renderPlatforms();
+const h = (location.hash || "").slice(1);
+setView(["cola", "pantalla", "historial"].includes(h) ? h : "cola");
+tick(); setInterval(tick, 1000);
+setInterval(() => { if (view === "pantalla") renderBoard(); }, 3000);
+keepAwake();
+</script>
+
+</body>
+</html>
